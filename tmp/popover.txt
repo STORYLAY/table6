@@ -1,0 +1,21 @@
+
+        {/* Hover Cell Popover (matches GridView) */}
+        {hoveredCell && hoveredCell.content && !activeEditingCell && (() => {
+            let popoverTop = hoveredCell.rect.bottom + 4;
+            let popoverLeft = hoveredCell.rect.left;
+            
+            const windowHeight = window.innerHeight;
+            if (popoverTop > windowHeight - 60) {
+                popoverTop = Math.max(0, hoveredCell.rect.top - 4 - 40);
+            }
+            
+            return createPortal(
+                <div 
+                    className="fixed z-[9999] bg-gray-800 text-white text-xs px-2 py-1.5 rounded shadow-xl pointer-events-none break-words max-w-[400px] animate-in fade-in zoom-in duration-200"
+                    style={{ top: popoverTop, left: popoverLeft }}
+                >
+                    {hoveredCell.content}
+                </div>,
+                document.body
+            );
+        })()}

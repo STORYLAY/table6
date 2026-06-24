@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>OmniBase | 下一代数据管理平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gray: {
+              25: '#fcfcfd',
+              50: '#f9fafb',
+              100: '#f2f4f7',
+              200: '#eaecf0',
+              300: '#d0d5dd',
+              400: '#98a2b3',
+              500: '#667085',
+              600: '#344054',
+              700: '#475467',
+              800: '#1d2939',
+              900: '#101828',
+            },
+            primary: {
+              25: '#f5f8ff',
+              50: '#eff4ff',
+              100: '#d1e0ff',
+              200: '#b2ccff',
+              300: '#84adff',
+              400: '#528bff',
+              500: '#2970ff',
+              600: '#155eef',
+              700: '#004eeb',
+              800: '#0040c1',
+              900: '#00359e',
+            },
+            blue: {
+              50: '#E1EFFE',
+              500: '#2970ff', // Fix: Use a proper blue for 500
+              600: '#155eef',
+              700: '#004eeb',
+            },
+            green: {
+              50: '#F3FAF7',
+              100: '#DEF7EC',
+              800: '#03543F',
+            },
+            yellow: {
+              100: '#FDF6B2',
+              800: '#723B13',
+            },
+            purple: {
+              50: '#F6F5FF',
+              200: '#DCD7FE',
+            },
+            indigo: {
+              25: '#F5F8FF',
+              50: '#EEF4FF',
+              100: '#E0EAFF',
+              300: '#A4BCFD',
+              400: '#8098F9',
+              600: '#444CE7',
+              800: '#2D31A6',
+            },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    /* Excel Preview Table */
+    .excel-preview-container table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 14px;
+      color: #333;
+    }
+    .excel-preview-container th,
+    .excel-preview-container td {
+      border: 1px solid #e2e8f0;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .excel-preview-container th {
+      background-color: #f8fafc;
+      font-weight: 600;
+    }
+    .excel-preview-container tr:nth-child(even) {
+      background-color: #fbfcfd;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "docx-preview": "https://esm.sh/docx-preview@0.3.2"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-gray-50 text-gray-900 overflow-hidden">
+  <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
