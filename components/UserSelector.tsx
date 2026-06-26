@@ -140,7 +140,7 @@ export const UserSelector = ({
                                 onClick={() => toggleUser(m)}
                             >
                                 <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0 text-xs text-gray-500 font-medium">
-                                    {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover" alt="" /> : ((m.real_name || m.name)?.[0] || 'U')}
+                                    {(m.avatar_url || m.avatar) ? <img src={m.avatar_url || m.avatar} className="w-full h-full object-cover" alt="" /> : ((m.real_name || m.name)?.[0] || 'U')}
                                 </div>
                                 <span className="truncate flex-1 text-gray-700">
                                     {m.real_name || m.name}

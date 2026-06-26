@@ -38,6 +38,7 @@ export class YjsSocketIOProvider {
     this.socket.on("row:inserted_below:broadcast", this.handleRemoteRowCreate);
     this.socket.on("row:copied:broadcast", this.handleRemoteRowCreate);
     this.socket.on("row:batch_copied:broadcast", this.handleRemoteBatchRowCreate);
+    this.socket.on("row:batch_created:broadcast", this.handleRemoteBatchRowCreated);
     this.socket.on("row:deleted:broadcast", this.handleRemoteRowDelete);
     this.socket.on("row:batch_deleted:broadcast", this.handleRemoteRowDelete);
     this.socket.on("row:moved:broadcast", this.handleRemoteRowMove);
@@ -57,6 +58,7 @@ export class YjsSocketIOProvider {
     this.socket.off("row:inserted_below:broadcast", this.handleRemoteRowCreate);
     this.socket.off("row:copied:broadcast", this.handleRemoteRowCreate);
     this.socket.off("row:batch_copied:broadcast", this.handleRemoteBatchRowCreate);
+    this.socket.off("row:batch_created:broadcast", this.handleRemoteBatchRowCreated);
     this.socket.off("row:deleted:broadcast", this.handleRemoteRowDelete);
     this.socket.off("row:batch_deleted:broadcast", this.handleRemoteRowDelete);
     this.socket.off("row:moved:broadcast", this.handleRemoteRowMove);
@@ -242,6 +244,46 @@ export class YjsSocketIOProvider {
           rowsMap.set(rowId, rowMap);
           console.log(
             `[YjsProvider] Successfully added remote batch copied row ${rowId} to Yjs doc!`,
+          );
+        }
+      });
+    }, "remote-socket");
+  };
+
+  /**
+   * Local Yjs Insertion handler for Row batch creation broadcast.
+   */
+  private handleRemoteBatchRowCreated = (event: any) => {
+    console.log("[YjsProvider] Received row:batch_created:broadcast ->", event);
+
+    let rowsData: any[] = [];
+    if (event && Array.isArray(event.data)) {
+      rowsData = event.data;
+    } else if (event && event.data && Array.isArray(event.data.data)) {
+      rowsData = event.data.data;
+    } else if (event && event.data && Array.isArray(event.data.rows_data)) {
+      rowsData = event.data.rows_data;
+    }
+
+    if (!rowsData || rowsData.length === 0) return;
+
+    this.doc.transact(() => {
+      const rowsMap = this.doc.getMap("rows") as Y.Map<Y.Map<any>>;
+      rowsData.forEach((rowPayload) => {
+        if (!rowPayload || rowPayload.table_id !== this.tableId) return;
+        const rowId = rowPayload.row_id;
+        const index = rowPayload.index !== undefined ? rowPayload.index : 0;
+        const parentId =
+          rowPayload.parent_id !== undefined ? rowPayload.parent_id : null;
+        const rowData = rowPayload.data || {};
+
+        if (!rowsMap.has(rowId)) {
+          shiftIndicesForInsert(rowsMap, parentId, index, 1);
+          const rowMap = new Y.Map();
+          rowYMapInit(rowMap, rowId, rowData, index, parentId);
+          rowsMap.set(rowId, rowMap);
+          console.log(
+            `[YjsProvider] Successfully added remote batch created row ${rowId} to Yjs doc!`,
           );
         }
       });

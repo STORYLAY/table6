@@ -134,7 +134,7 @@ const UserSelector = ({
                                 onClick={() => toggleUser(m)}
                             >
                                 <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0 text-xs text-gray-500 font-medium">
-                                    {m.avatar ? <img src={m.avatar} className="w-full h-full object-cover" alt="" /> : ((m.real_name || m.name)?.[0] || 'U')}
+                                    {(m.avatar_url || m.avatar) ? <img src={m.avatar_url || m.avatar} className="w-full h-full object-cover" alt="" /> : ((m.real_name || m.name)?.[0] || 'U')}
                                 </div>
                                 <span className="truncate flex-1 text-gray-700">
                                     {m.real_name || m.name}
@@ -396,6 +396,29 @@ const FieldConfigDialog: React.FC<FieldConfigDialogProps> = ({ tableId, column, 
     }
   }, [type, format]);
 
+  // 日期/时间默认值初始化 (日期默认为今天，时间默认为当前时间)
+  useEffect(() => {
+    if (type === FieldType.DATE && !defaultValue) {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const isDateTime = format?.includes('HH:mm') || DATE_FORMATS[0].value.includes('HH:mm');
+      if (isDateTime) {
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        setDefaultValue(`${year}-${month}-${day}T${hours}:${minutes}`);
+      } else {
+        setDefaultValue(`${year}-${month}-${day}`);
+      }
+    } else if (type === FieldType.TIME && !defaultValue) {
+      const d = new Date();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      setDefaultValue(`${hours}:${minutes}`);
+    }
+  }, [type, format, defaultValue]);
+
   // 默认关联表初始化
   useEffect(() => {
       if (type === FieldType.LINK && !linkedTableId && allTables.length > 0) {
@@ -633,7 +656,22 @@ const FieldConfigDialog: React.FC<FieldConfigDialogProps> = ({ tableId, column, 
               portal={true}
               options={DATE_FORMATS}
               value={format}
-              onChange={(val) => setFormat(val)}
+              onChange={(val) => {
+                setFormat(val);
+                // Adjust defaultValue to match format style (date vs datetime-local)
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const isDateTime = val.includes('HH:mm');
+                if (isDateTime) {
+                  const hours = String(d.getHours()).padStart(2, '0');
+                  const minutes = String(d.getMinutes()).padStart(2, '0');
+                  setDefaultValue(`${year}-${month}-${day}T${hours}:${minutes}`);
+                } else {
+                  setDefaultValue(`${year}-${month}-${day}`);
+                }
+              }}
             />
           </section>
         );
@@ -681,7 +719,7 @@ const FieldConfigDialog: React.FC<FieldConfigDialogProps> = ({ tableId, column, 
             </div>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
               {options.map((opt, idx) => (
-                <div key={idx} className="flex items-center gap-2">
+                <div key={idx} className="flex items-center gap-2 bg-gray-50 border border-gray-100 px-2 py-1.5 rounded-md hover:border-gray-200 transition-colors group">
                   <OptionColorPicker 
                       color={optionColors[opt] || 'gray'} 
                       onChange={(color) => {
@@ -689,16 +727,19 @@ const FieldConfigDialog: React.FC<FieldConfigDialogProps> = ({ tableId, column, 
                       }}
                       trigger={
                           <Tooltip content="点击修改颜色">
-                              <div className={`w-4 h-4 rounded-full flex-shrink-0 border border-gray-200 shadow-sm ${getOptionColorStyle(opt)}`} />
+                              <div className={`w-4 h-4 rounded-full flex-shrink-0 border border-gray-200 shadow-sm cursor-pointer ${getOptionColorStyle(opt)}`} />
                           </Tooltip>
                       }
                   />
                   <input 
                     value={opt}
                     onChange={(e) => handleOptionChange(idx, e.target.value)}
-                    className="flex-1 text-sm border-b border-gray-100 focus:border-primary-500 outline-none bg-transparent"
+                    className="flex-1 text-sm bg-transparent outline-none text-gray-700"
+                    placeholder="输入选项名称"
                   />
-                  <button onClick={() => setOptions(options.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-500">×</button>
+                  <button onClick={() => setOptions(options.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                    <ICONS.Close className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
               {options.length === 0 && (
@@ -916,7 +957,7 @@ const FieldConfigDialog: React.FC<FieldConfigDialogProps> = ({ tableId, column, 
                       {users.length > 0 ? users.map((u: any, i: number) => (
                           <div key={i} className="flex items-center gap-1 bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded-full text-[10px] border border-primary-100 shrink-0">
                               <div className="w-3.5 h-3.5 rounded-full bg-primary-200 flex items-center justify-center overflow-hidden text-[8px]">
-                                  {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" alt="" /> : ((u.real_name || u.name)?.[0] || 'U')}
+                                  {(u.avatar_url || u.avatar) ? <img src={u.avatar_url || u.avatar} className="w-full h-full object-cover" alt="" /> : ((u.real_name || u.name)?.[0] || 'U')}
                               </div>
                               <span className="truncate max-w-[60px]">{u.real_name || u.name}</span>
                               <button 
@@ -1082,7 +1123,36 @@ const FieldConfigDialog: React.FC<FieldConfigDialogProps> = ({ tableId, column, 
               portal={true}
               options={fieldTypes.map(t => ({ label: t.label, value: t.value }))}
               value={type}
-              onChange={(val) => setType(val)}
+              onChange={(val) => {
+                setType(val);
+                let targetFormat = '';
+                if (val === FieldType.NUMBER) targetFormat = NUMBER_FORMATS[0].value;
+                if (val === FieldType.DATE) targetFormat = DATE_FORMATS[0].value;
+                if (val === FieldType.TIME) targetFormat = TIME_FORMATS[1].value;
+                if (targetFormat) setFormat(targetFormat);
+
+                if (val === FieldType.DATE) {
+                  const d = new Date();
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const isDateTime = (targetFormat || '').includes('HH:mm');
+                  if (isDateTime) {
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+                    setDefaultValue(`${year}-${month}-${day}T${hours}:${minutes}`);
+                  } else {
+                    setDefaultValue(`${year}-${month}-${day}`);
+                  }
+                } else if (val === FieldType.TIME) {
+                  const d = new Date();
+                  const hours = String(d.getHours()).padStart(2, '0');
+                  const minutes = String(d.getMinutes()).padStart(2, '0');
+                  setDefaultValue(`${hours}:${minutes}`);
+                } else {
+                  setDefaultValue('');
+                }
+              }}
             />
           </section>
 

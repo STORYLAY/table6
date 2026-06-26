@@ -382,11 +382,13 @@ const App: React.FC<AppProps> = ({
 
   const {
     updateCell: syncUpdateCell,
+    updateCellLocal: syncUpdateCellLocal,
     createRow: syncCreateRow,
     insertRowAbove: syncInsertRowAbove,
     insertRowBelow: syncInsertRowBelow,
     duplicateRow: syncDuplicateRow,
     batchDuplicateRows: syncBatchDuplicateRows,
+    batchCreateRows: syncBatchCreateRows,
     deleteRow: syncDeleteRow,
     batchDeleteRows: syncBatchDeleteRows,
     moveRow: syncMoveRow,
@@ -620,16 +622,20 @@ const App: React.FC<AppProps> = ({
 
   const fetchUndoRedoStatus = useCallback(async () => {
     if (!activeTableId) return;
-    try {
-      const res = await api.getUndoRedoStatus(activeTableId);
-      if (res.data) {
-        setCanUndo(res.data.can_undo);
-        setCanRedo(res.data.can_redo);
+    if (socket && isConnected) {
+      socket.emit("operation:get_status", { table_id: activeTableId });
+    } else {
+      try {
+        const res = await api.getUndoRedoStatus(activeTableId);
+        if (res.data) {
+          setCanUndo(res.data.can_undo);
+          setCanRedo(res.data.can_redo);
+        }
+      } catch (err) {
+        console.error("Failed to fetch undo/redo status", err);
       }
-    } catch (err) {
-      console.error("Failed to fetch undo/redo status", err);
     }
-  }, [activeTableId]);
+  }, [activeTableId, socket, isConnected]);
 
   // --- Auth & Initial Load ---
   useEffect(() => {
@@ -1307,26 +1313,32 @@ const App: React.FC<AppProps> = ({
 
   const handleUndo = useCallback(async () => {
     if (!activeTableId || !canUndo) return;
-    try {
-      await api.undo(activeTableId);
-      // Refresh data and status
-      await fetchTableDetail(activeTableId);
-      await fetchRows(1, true);
-      await fetchUndoRedoStatus();
-    } catch (err: any) {
-      console.error("Undo failed", err);
-      // Handle "No undoable actions" error gracefully
-      if (
-        err.message &&
-        (err.message.includes("没有可撤回的操作") ||
-          err.message.includes("No undoable actions"))
-      ) {
-        await fetchUndoRedoStatus(); // Sync status
+    if (socket && isConnected) {
+      socket.emit("operation:undo", { table_id: activeTableId });
+    } else {
+      try {
+        await api.undo(activeTableId);
+        // Refresh data and status
+        await fetchTableDetail(activeTableId);
+        await fetchRows(1, true);
+        await fetchUndoRedoStatus();
+      } catch (err: any) {
+        console.error("Undo failed", err);
+        // Handle "No undoable actions" error gracefully
+        if (
+          err.message &&
+          (err.message.includes("没有可撤回的操作") ||
+            err.message.includes("No undoable actions"))
+        ) {
+          await fetchUndoRedoStatus(); // Sync status
+        }
       }
     }
   }, [
     activeTableId,
     canUndo,
+    socket,
+    isConnected,
     fetchTableDetail,
     fetchRows,
     fetchUndoRedoStatus,
@@ -1334,30 +1346,271 @@ const App: React.FC<AppProps> = ({
 
   const handleRedo = useCallback(async () => {
     if (!activeTableId || !canRedo) return;
-    try {
-      await api.redo(activeTableId);
-      // Refresh data and status
-      await fetchTableDetail(activeTableId);
-      await fetchRows(1, true);
-      await fetchUndoRedoStatus();
-    } catch (err: any) {
-      console.error("Redo failed", err);
-      // Handle "No redoable actions" error gracefully
-      if (
-        err.message &&
-        (err.message.includes("没有可恢复的操作") ||
-          err.message.includes("No redoable actions"))
-      ) {
-        await fetchUndoRedoStatus(); // Sync status
+    if (socket && isConnected) {
+      socket.emit("operation:redo", { table_id: activeTableId });
+    } else {
+      try {
+        await api.redo(activeTableId);
+        // Refresh data and status
+        await fetchTableDetail(activeTableId);
+        await fetchRows(1, true);
+        await fetchUndoRedoStatus();
+      } catch (err: any) {
+        console.error("Redo failed", err);
+        // Handle "No redoable actions" error gracefully
+        if (
+          err.message &&
+          (err.message.includes("没有可恢复的操作") ||
+            err.message.includes("No redoable actions"))
+        ) {
+          await fetchUndoRedoStatus(); // Sync status
+        }
       }
     }
   }, [
     activeTableId,
     canRedo,
+    socket,
+    isConnected,
     fetchTableDetail,
     fetchRows,
     fetchUndoRedoStatus,
   ]);
+
+  const fetchRowsRef = useRef(fetchRows);
+  const fetchTableDetailRef = useRef(fetchTableDetail);
+  const syncUpdateCellLocalRef = useRef(syncUpdateCellLocal);
+
+  useEffect(() => {
+    fetchRowsRef.current = fetchRows;
+    fetchTableDetailRef.current = fetchTableDetail;
+    syncUpdateCellLocalRef.current = syncUpdateCellLocal;
+  }, [fetchRows, fetchTableDetail, syncUpdateCellLocal]);
+
+  // Listen for WebSocket undo, redo, and status update events
+  useEffect(() => {
+    if (!socket || !activeTableId) return;
+
+    const handleStatusAck = (response: any) => {
+      console.log("[Socket] Received operation:get_status:ack:", response);
+      if (response && response.success && response.data) {
+        setCanUndo(!!response.data.can_undo);
+        setCanRedo(!!response.data.can_redo);
+      }
+    };
+
+    const applyPayloadUpdate = (data: any) => {
+      if (!data) return;
+      if (Array.isArray(data)) {
+        data.forEach(item => applyPayloadUpdate(item));
+        return;
+      }
+      const cellData = data.data || data;
+      if (cellData && cellData.row_id && cellData.column_id) {
+        syncUpdateCellLocalRef.current?.(cellData.row_id, cellData.column_id, cellData.value);
+      }
+    };
+
+    const handleUndoAck = (response: any) => {
+      console.log("[Socket] Received operation:undo:ack:", response);
+      const currentTableId = activeTableIdRef.current;
+      if (response && response.success !== false && currentTableId) {
+        applyPayloadUpdate(response.data);
+        // Safe timeout to ensure DB changes are fully settled and flushed
+        setTimeout(() => {
+          fetchTableDetailRef.current(currentTableId);
+          fetchRowsRef.current(1, true);
+        }, 50);
+        if (response.status) {
+          setCanUndo(!!response.status.can_undo);
+          setCanRedo(!!response.status.can_redo);
+        } else if (response.data) {
+          setCanUndo(!!response.data.can_undo);
+          setCanRedo(!!response.data.can_redo);
+        } else {
+          socket.emit("operation:get_status", { table_id: currentTableId });
+        }
+      }
+    };
+
+    const handleRedoAck = (response: any) => {
+      console.log("[Socket] Received operation:redo:ack:", response);
+      const currentTableId = activeTableIdRef.current;
+      if (response && response.success !== false && currentTableId) {
+        applyPayloadUpdate(response.data);
+        // Safe timeout to ensure DB changes are fully settled and flushed
+        setTimeout(() => {
+          fetchTableDetailRef.current(currentTableId);
+          fetchRowsRef.current(1, true);
+        }, 50);
+        if (response.status) {
+          setCanUndo(!!response.status.can_undo);
+          setCanRedo(!!response.status.can_redo);
+        } else if (response.data) {
+          setCanUndo(!!response.data.can_undo);
+          setCanRedo(!!response.data.can_redo);
+        } else {
+          socket.emit("operation:get_status", { table_id: currentTableId });
+        }
+      }
+    };
+
+    const handleUndoneBroadcast = (response: any) => {
+      console.log("[Socket] Received operation:undone:broadcast:", response);
+      const currentTableId = activeTableIdRef.current;
+      if (currentTableId) {
+        applyPayloadUpdate(response.data);
+        setTimeout(() => {
+          fetchTableDetailRef.current(currentTableId);
+          fetchRowsRef.current(1, true);
+        }, 50);
+        socket.emit("operation:get_status", { table_id: currentTableId });
+      }
+    };
+
+    const handleRedoneBroadcast = (response: any) => {
+      console.log("[Socket] Received operation:redone:broadcast:", response);
+      const currentTableId = activeTableIdRef.current;
+      if (currentTableId) {
+        applyPayloadUpdate(response.data);
+        setTimeout(() => {
+          fetchTableDetailRef.current(currentTableId);
+          fetchRowsRef.current(1, true);
+        }, 50);
+        socket.emit("operation:get_status", { table_id: currentTableId });
+      }
+    };
+
+    const handleStatusUpdatedBroadcast = (response: any) => {
+      console.log("[Socket] Received operation:status_updated:broadcast:", response);
+      const currentTableId = activeTableIdRef.current;
+      if (currentTableId) {
+        socket.emit("operation:get_status", { table_id: currentTableId });
+      }
+    };
+
+    const handleCellUpdateAck = (response: any) => {
+      console.log("[Socket] Received cell:update:ack in App:", response);
+      const currentTableId = activeTableIdRef.current;
+      if (response && response.success !== false) {
+        applyPayloadUpdate(response.data);
+      }
+      if (response && response.status) {
+        setCanUndo(!!response.status.can_undo);
+        setCanRedo(!!response.status.can_redo);
+      } else if (currentTableId) {
+        socket.emit("operation:get_status", { table_id: currentTableId });
+      }
+    };
+
+    const handleRowOperationAck = (response: any) => {
+      console.log("[Socket] Received row operation ack in App:", response);
+      const currentTableId = activeTableIdRef.current;
+      
+      if (response && response.success !== false && currentTableId) {
+        setTimeout(() => {
+          fetchRowsRef.current(1, true);
+        }, 50);
+      }
+      
+      if (response && response.status) {
+        setCanUndo(!!response.status.can_undo);
+        setCanRedo(!!response.status.can_redo);
+      } else if (currentTableId) {
+        socket.emit("operation:get_status", { table_id: currentTableId });
+      }
+    };
+
+    const handleTableDetailOperationAck = (response: any) => {
+      console.log("[Socket] Received table detail operation ack in App:", response);
+      const currentTableId = activeTableIdRef.current;
+      
+      if (response && response.success !== false && currentTableId) {
+        setTimeout(() => {
+          fetchTableDetailRef.current(currentTableId).then(() => {
+            fetchRowsRef.current(1, true);
+          });
+        }, 50);
+      }
+      
+      if (response && response.status) {
+        setCanUndo(!!response.status.can_undo);
+        setCanRedo(!!response.status.can_redo);
+      } else if (currentTableId) {
+        socket.emit("operation:get_status", { table_id: currentTableId });
+      }
+    };
+
+
+    socket.on("operation:get_status:ack", handleStatusAck);
+    socket.on("operation:undo:ack", handleUndoAck);
+    socket.on("operation:redo:ack", handleRedoAck);
+    socket.on("operation:undone:broadcast", handleUndoneBroadcast);
+    socket.on("operation:redone:broadcast", handleRedoneBroadcast);
+    socket.on("operation:status_updated:broadcast", handleStatusUpdatedBroadcast);
+    socket.on("cell:update:ack", handleCellUpdateAck);
+    socket.on("row:create:ack", handleRowOperationAck);
+    socket.on("row:insert_above:ack", handleRowOperationAck);
+    socket.on("row:insert_below:ack", handleRowOperationAck);
+    socket.on("row:copy:ack", handleRowOperationAck);
+    socket.on("row:batch_copy:ack", handleRowOperationAck);
+    socket.on("row:batch_create:ack", handleRowOperationAck);
+    socket.on("row:delete:ack", handleRowOperationAck);
+    socket.on("row:batch_delete:ack", handleRowOperationAck);
+    socket.on("row:move:ack", handleRowOperationAck);
+    socket.on("column:create:ack", handleTableDetailOperationAck);
+    socket.on("column:update:ack", handleTableDetailOperationAck);
+    socket.on("column:delete:ack", handleTableDetailOperationAck);
+    socket.on("column:batch_delete:ack", handleTableDetailOperationAck);
+    socket.on("column:update_sort:ack", handleTableDetailOperationAck);
+    socket.on("column:convert_type:ack", handleTableDetailOperationAck);
+    socket.on("view:create:ack", handleTableDetailOperationAck);
+    socket.on("view:update:ack", handleTableDetailOperationAck);
+    socket.on("view:rename:ack", handleTableDetailOperationAck);
+    socket.on("view:copy:ack", handleTableDetailOperationAck);
+    socket.on("view:delete:ack", handleTableDetailOperationAck);
+    socket.on("view:move:ack", handleTableDetailOperationAck);
+    socket.on("comment:create:ack", handleTableDetailOperationAck);
+    socket.on("comment:delete:ack", handleTableDetailOperationAck);
+
+    // If connected, request status immediately
+    if (isConnected) {
+      socket.emit("operation:get_status", { table_id: activeTableId });
+    }
+
+    return () => {
+      socket.off("operation:get_status:ack", handleStatusAck);
+      socket.off("operation:undo:ack", handleUndoAck);
+      socket.off("operation:redo:ack", handleRedoAck);
+      socket.off("operation:undone:broadcast", handleUndoneBroadcast);
+      socket.off("operation:redone:broadcast", handleRedoneBroadcast);
+      socket.off("operation:status_updated:broadcast", handleStatusUpdatedBroadcast);
+      socket.off("cell:update:ack", handleCellUpdateAck);
+      socket.off("row:create:ack", handleRowOperationAck);
+      socket.off("row:insert_above:ack", handleRowOperationAck);
+      socket.off("row:insert_below:ack", handleRowOperationAck);
+      socket.off("row:copy:ack", handleRowOperationAck);
+      socket.off("row:batch_copy:ack", handleRowOperationAck);
+      socket.off("row:batch_create:ack", handleRowOperationAck);
+      socket.off("row:delete:ack", handleRowOperationAck);
+      socket.off("row:batch_delete:ack", handleRowOperationAck);
+      socket.off("row:move:ack", handleRowOperationAck);
+      socket.off("column:create:ack", handleTableDetailOperationAck);
+      socket.off("column:update:ack", handleTableDetailOperationAck);
+      socket.off("column:delete:ack", handleTableDetailOperationAck);
+      socket.off("column:batch_delete:ack", handleTableDetailOperationAck);
+      socket.off("column:update_sort:ack", handleTableDetailOperationAck);
+      socket.off("column:convert_type:ack", handleTableDetailOperationAck);
+      socket.off("view:create:ack", handleTableDetailOperationAck);
+      socket.off("view:update:ack", handleTableDetailOperationAck);
+      socket.off("view:rename:ack", handleTableDetailOperationAck);
+      socket.off("view:copy:ack", handleTableDetailOperationAck);
+      socket.off("view:delete:ack", handleTableDetailOperationAck);
+      socket.off("view:move:ack", handleTableDetailOperationAck);
+      socket.off("comment:create:ack", handleTableDetailOperationAck);
+      socket.off("comment:delete:ack", handleTableDetailOperationAck);
+    };
+  }, [socket, activeTableId, isConnected]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -3185,6 +3438,8 @@ const App: React.FC<AppProps> = ({
         }
         syncUpdateCell(rowId, colId, valToSend);
       });
+      fetchUndoRedoStatus();
+      return;
     }
 
     try {
@@ -3294,6 +3549,8 @@ const App: React.FC<AppProps> = ({
         valToSend = sanitizeUserValue(value);
       }
       syncUpdateCell(rowId, colId, valToSend);
+      fetchUndoRedoStatus();
+      return;
     }
 
     try {
@@ -4188,7 +4445,7 @@ const App: React.FC<AppProps> = ({
 
   return (
     <>
-      <div className={`flex flex-col ${fullScreen ? "h-[calc(100vh-64px)]" : "h-full min-h-[500px]"} w-full overflow-hidden bg-white text-sm relative`}>
+      <div className={`flex flex-col ${fullScreen ? "h-[calc(100vh-100px)]" : "h-full min-h-[500px]"} w-full overflow-hidden bg-white text-sm relative`}>
         {/* Global Header */}
         {!hideHeader && (
           <header className="h-[64px] bg-white border-b border-gray-200 px-7 flex items-center justify-between  sticky top-0 shadow-sm shrink-0">

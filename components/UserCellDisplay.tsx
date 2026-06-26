@@ -40,7 +40,7 @@ const enrichUserValues = async (rawValues: any) => {
                 id: member.id,
                 name: member.name,
                 real_name: member.real_name,
-                avatar: member.avatar
+                avatar: member.avatar_url || member.avatar
             };
         }
         if (typeof u === 'object' && u !== null) {
@@ -150,7 +150,7 @@ export const UserCellDisplay = ({
             {users.map((u: any, i: number) => (
                 <div key={i} className="flex items-center gap-1 bg-primary-50 text-primary-700 px-1.5 py-0.5 rounded-full text-[10px] border border-primary-100 shrink-0 group">
                     <div className="w-3.5 h-3.5 rounded-full bg-primary-200 flex items-center justify-center overflow-hidden text-[8px]">
-                        {u.avatar ? <img src={u.avatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" /> : ((u.real_name || u.name)?.[0] || 'U')}
+                        {(u.avatar_url || u.avatar) ? <img src={u.avatar_url || u.avatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" /> : ((u.real_name || u.name)?.[0] || 'U')}
                     </div>
                     <span className="truncate max-w-[120px]">{highlightText(u.real_name || u.name || (typeof u === 'string' ? u : 'User'))}</span>
                     {onDelete && (

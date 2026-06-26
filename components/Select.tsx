@@ -257,7 +257,7 @@ export const Select: React.FC<SelectProps> = ({
                       setIsOpen(false);
                     }}
                   >
-                    <span className="whitespace-nowrap">{option.label}</span>
+                    <span className={`whitespace-nowrap ${option.value === '' ? 'text-gray-400' : ''}`}>{option.label}</span>
                     {isSelected && <ICONS.Check className="w-4 h-4 text-primary-600 shrink-0 ml-2" />}
                   </div>
                 );
@@ -287,7 +287,7 @@ export const Select: React.FC<SelectProps> = ({
           setIsOpen(!isOpen);
         }}
       >
-        <span className={`truncate min-w-0 flex items-center gap-2 ${!selectedOption ? 'text-gray-400' : 'text-gray-700'}`}>
+        <span className={`truncate min-w-0 flex items-center gap-2 ${(!selectedOption || selectedOption.value === '') ? 'text-gray-400' : 'text-gray-700'}`}>
           {selectedOption ? (
             <>
               {isModelSelector && selectedOption.icon && (
@@ -311,7 +311,7 @@ export const Select: React.FC<SelectProps> = ({
             placeholder
           )}
         </span>
-        <ICONS.ChevronDown className={`w-4 h-4 shrink-0 shrink-0 ml-2 transition-transform duration-200 ${disabled ? 'text-gray-300' : 'text-gray-500'} ${isOpen ? 'rotate-180' : ''}`} />
+        <ICONS.ChevronDown className={`w-4 h-4 shrink-0 shrink-0 ml-2 transition-transform duration-200 ${disabled ? 'text-gray-300' : 'text-gray-400'} ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {isOpen && !disabled && (

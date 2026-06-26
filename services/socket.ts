@@ -325,6 +325,30 @@ export class SocketManager {
   }
 
   /**
+   * Requests the undo/redo status for a given table.
+   */
+  public getUndoRedoStatus(tableId: string) {
+    const socket = this.getSocket();
+    socket.emit("operation:get_status", { table_id: tableId });
+  }
+
+  /**
+   * Requests undo of the last operation on a given table.
+   */
+  public undo(tableId: string) {
+    const socket = this.getSocket();
+    socket.emit("operation:undo", { table_id: tableId });
+  }
+
+  /**
+   * Requests redo of the next operation on a given table.
+   */
+  public redo(tableId: string) {
+    const socket = this.getSocket();
+    socket.emit("operation:redo", { table_id: tableId });
+  }
+
+  /**
    * Safely returns active Socket instance or throws if not initialized.
    */
   public getSocket(): Socket {

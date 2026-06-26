@@ -107,7 +107,7 @@ export function useTableSync({
     };
   }, [socket, tableId, doc, syncToReactState]);
 
-  // Sync initial rows when table loads for the first time
+  // Sync initial rows when table loads for the first time or updates dynamically (e.g. via REST/Undo/Redo)
   useEffect(() => {
     if (!tableId || initialRows.length === 0 || isInitializingRef.current)
       return;
@@ -117,22 +117,83 @@ export function useTableSync({
 
     isInitializingRef.current = true;
 
-    doc.transact(() => {
-      initialRows.forEach((row) => {
-        if (!rowsMap.has(row.id)) {
-          const rowYMap = new Y.Map();
-          rowYMapInit(
-            rowYMap,
-            row.id,
-            row.data,
-            row.index || 0,
-            row.parent_id || null,
-          );
-          rowsMap.set(row.id, rowYMap);
-          newlySeeded = true;
-        }
-      });
-    }, "local-initial-seed");
+    try {
+      doc.transact(() => {
+        // 1. Synchronize row deletions
+        const activeIds = new Set(initialRows.map((r) => r.id));
+        rowsMap.forEach((_, rowId) => {
+          if (!activeIds.has(rowId)) {
+            rowsMap.delete(rowId);
+            newlySeeded = true;
+          }
+        });
+
+        // 2. Synchronize additions & updates
+        initialRows.forEach((row) => {
+          if (!rowsMap.has(row.id)) {
+            const rowYMap = new Y.Map();
+            rowYMapInit(
+              rowYMap,
+              row.id,
+              row.data,
+              row.index || 0,
+              row.parent_id || null,
+            );
+            rowsMap.set(row.id, rowYMap);
+            newlySeeded = true;
+          } else {
+            // Row exists. Compare and update fields, index, and parent_id
+            const rowYMap = rowsMap.get(row.id);
+            if (rowYMap instanceof Y.Map) {
+              let rowChanged = false;
+
+              // Sync index
+              if (rowYMap.get("index") !== row.index) {
+                rowYMap.set("index", row.index ?? 0);
+                rowChanged = true;
+              }
+
+              // Sync parent_id
+              if (rowYMap.get("parent_id") !== row.parent_id) {
+                rowYMap.set("parent_id", row.parent_id || null);
+                rowChanged = true;
+              }
+
+              // Sync data values
+              const dataYMap = rowYMap.get("data");
+              if (dataYMap instanceof Y.Map) {
+                Object.entries(row.data || {}).forEach(([colId, val]) => {
+                  const currentYVal = dataYMap.get(colId);
+                  const isDiff =
+                    typeof val === "object" && val !== null
+                      ? JSON.stringify(val) !== JSON.stringify(currentYVal)
+                      : currentYVal !== val;
+
+                  if (isDiff) {
+                    dataYMap.set(colId, val);
+                    rowChanged = true;
+                  }
+                });
+
+                // Clean up keys deleted from the React side
+                dataYMap.forEach((_, colId) => {
+                  if (row.data && !(colId in row.data)) {
+                    dataYMap.delete(colId);
+                    rowChanged = true;
+                  }
+                });
+              }
+
+              if (rowChanged) {
+                newlySeeded = true;
+              }
+            }
+          }
+        });
+      }, "local-initial-seed");
+    } finally {
+      isInitializingRef.current = false;
+    }
 
     isInitializingRef.current = false;
     
@@ -231,6 +292,26 @@ export function useTableSync({
       });
     },
     [tableId, socket, doc, emitWithAckQueue]
+  );
+
+  const updateCellLocal = useCallback(
+    (rowId: string, columnId: string, value: any) => {
+      doc.transact(() => {
+        const rowsMap = doc.getMap("rows") as Y.Map<Y.Map<any>>;
+        let rowMap = rowsMap.get(rowId);
+
+        if (!rowMap) {
+          rowYMapInit((rowMap = new Y.Map()), rowId, {}, 0, null);
+          rowsMap.set(rowId, rowMap);
+        }
+
+        const dataMap = rowMap.get("data");
+        if (dataMap instanceof Y.Map) {
+          dataMap.set(columnId, value);
+        }
+      }, "local-mutation");
+    },
+    [doc]
   );
 
   const createRowQueueRef = useRef<Array<(res: any) => void>>([]);
@@ -598,6 +679,82 @@ export function useTableSync({
   );
 
   /**
+   * Action: Batch Create rows.
+   */
+  const batchCreateRows = useCallback(
+    (
+      rowsPayload: Array<{ data: Record<string, any>; index: number | null; parent_id?: string | null }>,
+      onAck?: (rowsData: any[]) => void,
+    ) => {
+      if (!tableId || !socket) return;
+
+      emitWithAckQueue(
+        "row:batch_create",
+        {
+          table_id: tableId,
+          rows_data: rowsPayload,
+        },
+        "row:batch_create:ack",
+        (response: any) => {
+          let returnedRows: any[] = [];
+          if (response && response.success) {
+            if (Array.isArray(response.data)) {
+              returnedRows = response.data;
+            } else if (response.data && Array.isArray(response.data.data)) {
+              returnedRows = response.data.data;
+            } else if (response.data && Array.isArray(response.data.rows_data)) {
+              returnedRows = response.data.rows_data;
+            }
+          }
+
+          if (returnedRows.length > 0) {
+            doc.transact(() => {
+              const rowsMap = doc.getMap("rows") as Y.Map<Y.Map<any>>;
+              returnedRows.forEach((rowPayload: any) => {
+                const newRowId = rowPayload.row_id;
+                const index = rowPayload.index ?? 0;
+                if (!rowsMap.has(newRowId)) {
+                  shiftIndicesForInsert(rowsMap, rowPayload.parent_id || null, index, 1);
+                  const rowYMap = new Y.Map();
+                  rowYMapInit(
+                    rowYMap,
+                    newRowId,
+                    rowPayload.data || {},
+                    index,
+                    rowPayload.parent_id || null,
+                  );
+                  rowsMap.set(newRowId, rowYMap);
+                }
+              });
+            }, "local-mutation");
+
+            const targetRoom = socketManager.getJoinedRoom(tableId);
+            socket.emit("row:batch_created:broadcast", {
+              room: targetRoom,
+              success: response.success ?? true,
+              data: returnedRows.map((rowPayload: any) => ({
+                account_id: rowPayload.account_id ?? "",
+                table_id: rowPayload.table_id ?? tableId,
+                row_id: rowPayload.row_id ?? "",
+                parent_id: rowPayload.parent_id || null,
+                data: rowPayload.data || {},
+                index: rowPayload.index ?? 0,
+                created_at: rowPayload.created_at ?? new Date().toISOString(),
+                updated_at: rowPayload.updated_at ?? new Date().toISOString(),
+              })),
+              action: "batch_create",
+              total: response.total ?? 0,
+            });
+
+            if (onAck) onAck(returnedRows);
+          }
+        }
+      );
+    },
+    [tableId, socket, doc, emitWithAckQueue]
+  );
+
+  /**
    * Action: Delete a row.
    */
   const deleteRow = useCallback(
@@ -728,11 +885,13 @@ export function useTableSync({
   return {
     doc,
     updateCell,
+    updateCellLocal,
     createRow,
     insertRowAbove,
     insertRowBelow,
     duplicateRow,
     batchDuplicateRows,
+    batchCreateRows,
     deleteRow,
     batchDeleteRows,
     moveRow,
