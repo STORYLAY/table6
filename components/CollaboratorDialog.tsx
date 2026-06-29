@@ -23,8 +23,8 @@ const CollaboratorDialog: React.FC<CollaboratorDialogProps> = ({ tableId, onClos
   const [roles, setRoles] = useState<{role_id: string, role_name: string}[]>([]);
   const [depts, setDepts] = useState<{dept_id: string, dept_name: string}[]>([]);
   const [collaboratorRoles, setCollaboratorRoles] = useState<{label: string, value: string}[]>([
-      { value: 'READ', label: '可阅读' },
-      { value: 'EDIT', label: '可编辑' }
+      { value: 'READ', label: '查看' },
+      { value: 'EDIT', label: '编辑' }
   ]);
   
   const [searchName, setSearchName] = useState('');
@@ -116,7 +116,10 @@ const CollaboratorDialog: React.FC<CollaboratorDialogProps> = ({ tableId, onClos
       // First add API roles, normalizing their labels
       for (const r of apiRoles) {
           const rawValue = String(r.value !== undefined ? r.value : r.id).toUpperCase();
-          const rawLabel = r.label !== undefined ? r.label : r.name;
+          let rawLabel = r.label !== undefined ? r.label : r.name;
+          
+          if (rawLabel === '查看者' || rawLabel === '可阅读') rawLabel = '查看';
+          if (rawLabel === '编辑者' || rawLabel === '可编辑') rawLabel = '编辑';
           
           if (rawValue === 'MANAGE') continue;
 

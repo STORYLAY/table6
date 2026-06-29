@@ -42,7 +42,7 @@ export const Select: React.FC<SelectProps> = ({
   const selectRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number, bottom?: number, left: number, width: number }>({ top: 0, left: 0, width: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number, bottom?: number, left: number, width: number, maxHeight?: number }>({ top: 0, left: 0, width: 0 });
 
   const showFilter = isModelSelector || showSearch;
   
@@ -140,6 +140,7 @@ export const Select: React.FC<SelectProps> = ({
         bottom: viewportHeight - rect.top + 4,
         left: rect.left,
         width: rect.width,
+        maxHeight: spaceAbove - 10,
       });
     } else {
       setDropdownPosition({
@@ -147,6 +148,7 @@ export const Select: React.FC<SelectProps> = ({
         bottom: undefined,
         left: rect.left,
         width: rect.width,
+        maxHeight: spaceBelow - 10,
       });
     }
   };
@@ -195,8 +197,8 @@ export const Select: React.FC<SelectProps> = ({
     <div 
       ref={dropdownRef} 
       data-select-dropdown="true"
-      className={`z-[20000] bg-white border border-gray-200 rounded-xl shadow-xl shadow-black/[0.04] overflow-y-auto max-h-[300px] flex flex-col transform origin-top animate-in fade-in slide-in-from-top-2 duration-200 ${portal ? '' : 'absolute left-0 mt-2 min-w-full w-max max-w-[320px]'}`}
-      style={portal ? { position: 'fixed', top: dropdownPosition.top, bottom: dropdownPosition.bottom, left: dropdownPosition.left, minWidth: dropdownPosition.width, width: 'max-content', maxWidth: 'min(400px, 90vw)' } : {}}
+      className={`z-[20000] bg-white border border-gray-200 rounded-xl shadow-xl shadow-black/[0.04] flex flex-col transform origin-top animate-in fade-in slide-in-from-top-2 duration-200 ${portal ? '' : 'absolute left-0 mt-2 min-w-full w-max max-w-[320px] max-h-[300px]'}`}
+      style={portal ? { position: 'fixed', top: dropdownPosition.top, bottom: dropdownPosition.bottom, left: dropdownPosition.left, minWidth: dropdownPosition.width, width: 'max-content', maxWidth: 'min(400px, 90vw)', maxHeight: dropdownPosition.maxHeight ? Math.min(300, dropdownPosition.maxHeight) : 300 } : {}}
     >
       {showFilter && (
         <div className="p-2 border-b border-gray-100 flex-shrink-0 bg-white">

@@ -183,6 +183,7 @@ const App: React.FC<AppProps> = ({
 
   const [hasMore, setHasMore] = useState(false);
   const dragControls = useDragControls();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -4517,7 +4518,7 @@ const App: React.FC<AppProps> = ({
             </>
           )}
 
-          <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+          <div ref={searchContainerRef} className="flex-1 flex flex-col h-full overflow-hidden relative">
             {activeTable && activeView && activeView.type === ViewType.FORM && (
               <FormViewBuilder
                 table={activeTable}
@@ -4533,7 +4534,7 @@ const App: React.FC<AppProps> = ({
             )}
 
             {activeTable && activeView?.type !== ViewType.FORM && (
-              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 h-[56px] shrink-0 px-2 w-full relative z-index:40">
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 h-[56px] shrink-0 px-2 w-full relative z-40">
                 <div className="flex items-center gap-1 overflow-x-auto no-scrollbar h-full">
                   {!isSidebarOpen && !hideSidebar && (
                     <button
@@ -5397,9 +5398,12 @@ const App: React.FC<AppProps> = ({
           {isSearchOpen && activeView && (
             <motion.div
               drag
+              dragConstraints={searchContainerRef}
+              dragElastic={0.1}
+              dragMomentum={false}
               dragControls={dragControls}
               dragListener={false}
-              className="absolute top-4 right-4 z-index:40"
+              className="absolute top-4 right-4 z-[9999]"
             >
               <div className="bg-white shadow-xl border border-gray-200 rounded-lg p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div
