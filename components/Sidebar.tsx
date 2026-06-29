@@ -232,7 +232,7 @@ const Sidebar: React.FC<SidebarProps> = ({
              <button 
                 onClick={() => {
                    const table = tables.find(t => t.id === contextMenu.tableId);
-                   if (table && table.role === 'READ') {
+                   if (table && table.can_edit === false && table.can_manage === false) {
                        toast.error("您没有权限编辑此自定义属性");
                        return;
                    }
@@ -242,7 +242,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                    setContextMenu(null);
                 }}
                 className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${
-                    tables.find(t => t.id === contextMenu.tableId)?.role === 'READ'
+                    tables.find(t => t.id === contextMenu.tableId)?.can_edit === false && tables.find(t => t.id === contextMenu.tableId)?.can_manage === false
                     ? 'text-gray-300 cursor-not-allowed'
                     : 'hover:bg-primary-50 hover:text-primary-600 text-gray-700'
                 }`}
@@ -259,7 +259,7 @@ const Sidebar: React.FC<SidebarProps> = ({
              <button 
                 onClick={() => { 
                    const table = tables.find(t => t.id === contextMenu.tableId);
-                   if (table && table.role !== 'MANAGE') {
+                   if (table && table.can_delete === false && table.can_manage === false) {
                        toast.error("您没有权限删除此项目");
                        return;
                    }
@@ -267,7 +267,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                    setContextMenu(null); 
                 }}
                 className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${
-                    tables.find(t => t.id === contextMenu.tableId)?.role !== 'MANAGE'
+                    tables.find(t => t.id === contextMenu.tableId)?.can_delete === false && tables.find(t => t.id === contextMenu.tableId)?.can_manage === false
                     ? 'text-gray-300 cursor-not-allowed'
                     : 'hover:bg-red-50 hover:text-red-600 text-red-500'
                 }`}

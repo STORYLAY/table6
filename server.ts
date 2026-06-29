@@ -265,7 +265,7 @@ async function startServer() {
   });
 
   // 获取表格权限选项
-  app.get(`${API_BASE}/tables/collaborator-roles`, (req, res) => {
+  app.get(`/console/api/apps/rg/permission-types/choices`, (req, res) => {
     res.json({ data: [{ id: "admin", name: "管理员" }, { id: "editor", name: "编辑者" }, { id: "viewer", name: "查看者" }], message: "success" });
   });
 

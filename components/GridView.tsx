@@ -3401,7 +3401,7 @@ const GridView: React.FC<GridViewProps> = ({
       <div className="flex-1 overflow-auto bg-white" onScroll={handleScroll}>
         <div className="w-max min-w-full">
           {/* Header */}
-          <div className="flex border-b border-gray-200 bg-[#f8fafc] font-medium text-xs text-gray-500 sticky top-0 z-40">
+          <div className="flex border-b border-gray-200 bg-[#f8fafc] font-medium text-xs text-gray-500 sticky top-0">
             <div
               className="w-10 shrink-0 border-r border-gray-200 flex items-center justify-center bg-[#f8fafc] cursor-pointer"
               onClick={handleSelectAll}

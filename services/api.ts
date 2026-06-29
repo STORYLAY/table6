@@ -65,7 +65,7 @@ export const api = {
 
   // --- 接口: 获取表格权限选项 ---
   getCollaboratorRoles: (): Promise<ApiResponse<ApiOption[]>> => 
-    fetch(`${BASE_URL}/tables/collaborator-roles`, { headers: getHeaders() })
+    fetch(`${API_HOST}/console/api/apps/rg/permission-types/choices?resource_type=MDTABLE`, { headers: getHeaders() })
       .then(handleResponse)
       .then(res => Array.isArray(res) ? { data: res, message: 'success' } : res),
 

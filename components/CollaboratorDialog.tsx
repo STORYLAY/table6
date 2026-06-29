@@ -5,6 +5,7 @@ import { Tooltip } from './Tooltip';
 import { debounce } from 'lodash-es';
 import { toast } from 'sonner';
 import ConfirmDialog from './ConfirmDialog';
+import { Select } from './Select';
 
 interface CollaboratorDialogProps {
   tableId: string;
@@ -36,8 +37,10 @@ const CollaboratorDialog: React.FC<CollaboratorDialogProps> = ({ tableId, onClos
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [assignRole, setAssignRole] = useState('READ'); // Default role to assign
   const [assigning, setAssigning] = useState(false);
+
+  const getRole = (c: any) => c.role || (c.can_manage ? 'MANAGE' : c.can_edit ? 'EDIT' : c.can_read ? 'READ' : '');
   
-  const selectableMembers = members.filter(m => !collaborators.some(c => c.account_id === m.id && c.role === 'MANAGE'));
+  const selectableMembers = members.filter(m => !collaborators.some(c => c.account_id === m.id && getRole(c) === 'MANAGE'));
   const allSelected = selectableMembers.length > 0 && selectableMembers.every(m => selectedMembers.has(m.id));
 
   const toggleSelectAll = () => {
@@ -112,24 +115,24 @@ const CollaboratorDialog: React.FC<CollaboratorDialogProps> = ({ tableId, onClos
 
       // First add API roles, normalizing their labels
       for (const r of apiRoles) {
-          if (r.value === 'MANAGE') continue;
-          let label = r.label;
-          let val = String(r.value).toUpperCase();
-          if (val === 'READ' || label === '查看者' || label === '可阅读') { label = '可阅读'; val = 'READ'; }
-          if (val === 'EDIT' || val === 'EDITOR' || label === '编辑者' || label === '可编辑') { label = '可编辑'; val = 'EDIT'; }
-          if (!seenValues.has(val)) {
-              seenValues.add(val);
-              normalizedCollabRoles.push({ ...r, value: val, label });
+          const rawValue = String(r.value !== undefined ? r.value : r.id).toUpperCase();
+          const rawLabel = r.label !== undefined ? r.label : r.name;
+          
+          if (rawValue === 'MANAGE') continue;
+
+          if (!seenValues.has(rawValue)) {
+              seenValues.add(rawValue);
+              normalizedCollabRoles.push({ ...r, value: rawValue, label: rawLabel });
           }
       }
 
       // Ensure standard roles
       if (!seenValues.has('READ')) {
-          normalizedCollabRoles.push({ value: 'READ', label: '可阅读' });
+          normalizedCollabRoles.push({ value: 'READ', label: '查看' });
           seenValues.add('READ');
       }
       if (!seenValues.has('EDIT')) {
-          normalizedCollabRoles.push({ value: 'EDIT', label: '可编辑' });
+          normalizedCollabRoles.push({ value: 'EDIT', label: '编辑' });
           seenValues.add('EDIT');
       }
 
@@ -305,27 +308,26 @@ const CollaboratorDialog: React.FC<CollaboratorDialogProps> = ({ tableId, onClos
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <select
-                                                value={c.role === 'EDITOR' ? 'EDIT' : c.role}
-                                                onChange={(e) => handleUpdateCollaborator(c.id, e.target.value, c.can_share)}
-                                                disabled={c.role === 'MANAGE'}
-                                                className={`pl-2 pr-7 py-1 bg-gray-100 text-gray-600 text-xs rounded font-medium border-none focus:ring-0 whitespace-nowrap w-auto min-w-fit ${c.role === 'MANAGE' ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
-                                            >
-                                                {!collaboratorRoles.find(r => r.value === (c.role === 'EDITOR' ? 'EDIT' : c.role)) && (
-                                                    <option value={c.role}>{c.ch_role || c.role}</option>
-                                                )}
-                                                {collaboratorRoles.length > 0 ? (
-                                                    collaboratorRoles.map(r => (
-                                                        <option key={r.value} value={r.value}>{r.label}</option>
-                                                    ))
-                                                ) : (
-                                                    <>
-                                                        <option value="READ">可阅读</option>
-                                                        <option value="EDIT">可编辑</option>
-                                                    </>
-                                                )}
-                                            </select>
-                                            {c.role !== 'MANAGE' ? (
+                                            <Select
+                                                value={getRole(c) === 'EDITOR' ? 'EDIT' : getRole(c)}
+                                                onChange={(value) => handleUpdateCollaborator(c.id, value, c.can_share)}
+                                                disabled={getRole(c) === 'MANAGE'}
+                                                options={
+                                                    collaboratorRoles.length > 0 
+                                                        ? [
+                                                            ...(!collaboratorRoles.find(r => r.value === (getRole(c) === 'EDITOR' ? 'EDIT' : getRole(c))) 
+                                                                ? [{ label: c.ch_role || getRole(c), value: getRole(c) }] 
+                                                                : []),
+                                                            ...collaboratorRoles.map(r => ({ label: r.label || r.value, value: r.value }))
+                                                          ]
+                                                        : [
+                                                            { label: '查看', value: 'READ' },
+                                                            { label: '编辑', value: 'EDIT' }
+                                                          ]
+                                                }
+                                                className={`w-28 ${getRole(c) === 'MANAGE' ? 'opacity-70' : ''}`}
+                                            />
+                                            {getRole(c) !== 'MANAGE' ? (
                                     <Tooltip content="移除成员">
                                         <button 
                                             onClick={() => handleDeleteCollaborator(c.id)}
@@ -412,7 +414,7 @@ const CollaboratorDialog: React.FC<CollaboratorDialogProps> = ({ tableId, onClos
                             <div className="grid grid-cols-2 gap-3">
                                 {members.map(m => {
                                     const isSelected = selectedMembers.has(m.id);
-                                    const isManager = collaborators.some(c => c.account_id === m.id && c.role === 'MANAGE');
+                                    const isManager = collaborators.some(c => c.account_id === m.id && getRole(c) === 'MANAGE');
                                     return (
                                         <div 
                                             key={m.id}
@@ -450,15 +452,12 @@ const CollaboratorDialog: React.FC<CollaboratorDialogProps> = ({ tableId, onClos
                             已选择 <span className="font-bold text-primary-600">{selectedMembers.size}</span> 名用户
                         </div>
                         <div className="flex items-center gap-3">
-                            <select 
+                            <Select 
                                 value={assignRole}
-                                onChange={(e) => setAssignRole(e.target.value)}
-                                className="text-sm border border-gray-200 rounded-lg pl-3 pr-8 py-2 bg-gray-50 focus:outline-none focus:border-primary-500 whitespace-nowrap w-auto min-w-fit"
-                            >
-                                {collaboratorRoles.map(r => (
-                                    <option key={r.value} value={r.value}>{r.label}</option>
-                                ))}
-                            </select>
+                                onChange={(value) => setAssignRole(value)}
+                                options={collaboratorRoles.map(r => ({ label: r.label || r.value, value: r.value }))}
+                                className="w-32"
+                            />
                             <button 
                                 onClick={handleAssign}
                                 disabled={selectedMembers.size === 0 || assigning}

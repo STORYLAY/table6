@@ -30,8 +30,10 @@ export enum ViewType {
 
 // 通用选项接口 (用于字段类型、视图类型、筛选条件、排序方向)
 export interface ApiOption {
-  label: string;
-  value: string;
+  label?: string;
+  value?: string;
+  id?: string;
+  name?: string;
   multi?: boolean;
 }
 
@@ -198,7 +200,11 @@ export interface Table {
   id: string;
   name: string;
   description?: string;
-  role?: 'READ' | 'EDIT' | 'EDITOR' | 'MANAGE';
+  role?: 'READ' | 'EDIT' | 'EDITOR' | 'MANAGE'; // deprecated
+  can_read?: boolean;
+  can_edit?: boolean;
+  can_delete?: boolean;
+  can_manage?: boolean;
   column_count?: number;
   row_count?: number;
   view_count?: number;

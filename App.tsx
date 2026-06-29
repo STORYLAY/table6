@@ -178,6 +178,9 @@ const App: React.FC<AppProps> = ({
   );
   const [page, setPage] = useState(1);
   const pageRef = useRef(1);
+
+  const isTableReadonly = readonly || isSharedMode || (activeTable ? (activeTable.can_edit === false && activeTable.can_manage === false) : false);
+
   const [hasMore, setHasMore] = useState(false);
   const dragControls = useDragControls();
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -2608,7 +2611,7 @@ const App: React.FC<AppProps> = ({
         );
       }
 
-      if (readonly || isSharedMode) {
+    if (isTableReadonly) {
         // Only apply in local state, do not push to server
         return;
       }
@@ -2986,7 +2989,7 @@ const App: React.FC<AppProps> = ({
     specificId?: string,
     index?: number,
   ) => {
-    if (readonly || isSharedMode) return;
+    if (isTableReadonly) return;
     if (!activeTableId || !activeTable || activeTable.id !== activeTableId)
       return;
 
@@ -3012,7 +3015,7 @@ const App: React.FC<AppProps> = ({
     initialData: Record<string, any> = {},
     index?: number,
   ) => {
-    if (readonly || isSharedMode) return null;
+    if (isTableReadonly) return null;
     if (!activeTableId || !activeTable || activeTable.id !== activeTableId)
       return null;
 
@@ -3115,7 +3118,7 @@ const App: React.FC<AppProps> = ({
     parentId: string,
     initialData: Record<string, any> = {},
   ) => {
-    if (readonly || isSharedMode) return;
+    if (isTableReadonly) return;
     if (!activeTableId || !activeTable || activeTable.id !== activeTableId)
       return;
     const dataWithDefaults: Record<string, any> = { ...initialData };
@@ -3186,7 +3189,7 @@ const App: React.FC<AppProps> = ({
     initialData?: Record<string, any>,
     count: number = 1,
   ) => {
-    if (readonly || isSharedMode) return;
+    if (isTableReadonly) return;
     if (!activeTableId || !activeTable || activeTable.id !== activeTableId)
       return;
     const dataWithDefaults = { ...(initialData || {}) };
@@ -3314,7 +3317,7 @@ const App: React.FC<AppProps> = ({
   };
 
   const handleDeleteRow = async (rowId: string) => {
-    if (readonly || isSharedMode) return;
+    if (isTableReadonly) return;
     if (!activeTableId || !activeTable || activeTable.id !== activeTableId)
       return;
     try {
@@ -3352,7 +3355,7 @@ const App: React.FC<AppProps> = ({
   };
 
   const handleDeleteRows = async (rowIds: string[]) => {
-    if (readonly || isSharedMode) return;
+    if (isTableReadonly) return;
     if (!activeTableId || !activeTable || activeTable.id !== activeTableId)
       return;
     try {
@@ -3521,7 +3524,7 @@ const App: React.FC<AppProps> = ({
   };
 
   const handleCellChange = async (rowId: string, colId: string, value: any) => {
-    if (readonly || isSharedMode) return;
+    if (isTableReadonly) return;
     if (!activeTableId || !activeTable || activeTable.id !== activeTableId)
       return;
     const currentRow = findRowInTree(rows, rowId);
@@ -3984,7 +3987,7 @@ const App: React.FC<AppProps> = ({
     if (!activeView || !activeTable) return null;
     const closeMenus = () => setOpenMenu(null);
 
-    const addRecordButton = (readonly || isSharedMode) ? null : (
+    const addRecordButton = isTableReadonly ? null : (
       <>
         <button
           onClick={async () => {
@@ -4102,7 +4105,7 @@ const App: React.FC<AppProps> = ({
       return (
         <div className="flex items-center gap-2" id="tour-toolbar">
           {addRecordButton}
-          {!(readonly || isSharedMode) && (
+          {!isTableReadonly && (
             <div className="relative">
               <ToolbarButton
                 icon={<ICONS.Settings />}
@@ -4308,7 +4311,7 @@ const App: React.FC<AppProps> = ({
             </ClickOutsideWrapper>
           )}
         </div>
-        {!(readonly || isSharedMode) && (
+        {!isTableReadonly && (
           <div className="relative">
             <ToolbarButton
               icon={<ICONS.Settings />}
@@ -4530,7 +4533,7 @@ const App: React.FC<AppProps> = ({
             )}
 
             {activeTable && activeView?.type !== ViewType.FORM && (
-              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 h-[56px] shrink-0 px-2 w-full relative z-[60]">
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 h-[56px] shrink-0 px-2 w-full relative z-index:40">
                 <div className="flex items-center gap-1 overflow-x-auto no-scrollbar h-full">
                   {!isSidebarOpen && !hideSidebar && (
                     <button
@@ -4546,7 +4549,7 @@ const App: React.FC<AppProps> = ({
                       <span className="text-sm font-bold text-gray-700 truncate">
                         {activeTable.name}
                       </span>
-                      {activeTable.role !== 'READ' && (
+                      {activeTable.can_manage !== false && (
                         <button
                           onClick={() => handleOpenEditTableWithMetadata(activeTable.id)}
                           className="opacity-0 group-hover/tablename:opacity-100 p-0.5 text-gray-400 hover:text-primary-600 rounded hover:bg-gray-200 transition-all"
@@ -4593,7 +4596,7 @@ const App: React.FC<AppProps> = ({
                           }
                           className={`px-4 py-2 flex items-center gap-2 text-xs transition-all relative rounded-t-md border-t border-x ${
                             activeViewId === view.id
-                              ? "bg-white border-gray-200 text-primary-600 font-bold -mb-[1px] z-10"
+                              ? "bg-white border-gray-200 text-primary-600 font-bold -mb-[1px]"
                               : "bg-transparent border-transparent text-gray-500 hover:bg-gray-100"
                           }`}
                         >
@@ -4625,7 +4628,7 @@ const App: React.FC<AppProps> = ({
                       )}
                     </div>
                   ))}
-                  {!(readonly || isSharedMode) && (
+                  {!isTableReadonly && (
                     <button
                       onClick={handleAddView}
                       className="p-2 hover:bg-gray-200 rounded-md text-gray-400 hover:text-primary-600 transition-colors shrink-0"
@@ -4637,7 +4640,7 @@ const App: React.FC<AppProps> = ({
                 </div>
 
                 {/* Real-time Collaboration Status & Avatars on the right */}
-                {!(readonly || isSharedMode) && (
+                {!isTableReadonly && (
                   <div className="flex items-center gap-2 px-2 shrink-0 relative">
                     <div
                     onClick={() => setIsOnlineUsersOpen(!isOnlineUsersOpen)}
@@ -4853,7 +4856,7 @@ const App: React.FC<AppProps> = ({
             )}
 
             {/* Top Header */}
-            <div className="h-12 border-b border-gray-200 flex items-center justify-between px-4 bg-white shrink-0 relative z-50">
+            <div className="h-12 border-b border-gray-200 flex items-center justify-between px-4 bg-white shrink-0 relative z-index:40">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1">{renderToolbar()}</div>
               </div>
@@ -4877,7 +4880,7 @@ const App: React.FC<AppProps> = ({
                     >
                       <ICONS.Download className="w-4 h-4" /> 导出表格
                     </button>
-                    {!(readonly || isSharedMode) && (
+                    {!isTableReadonly && (
                       <button
                         onClick={() => setIsAppendDialogOpen(true)}
                         className="flex items-center gap-1 px-3 py-1.5 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded transition-colors font-medium text-xs mr-2"
@@ -4888,7 +4891,7 @@ const App: React.FC<AppProps> = ({
                     )}
                   </div>
                 )}
-                {!(readonly || isSharedMode) && (
+                {!isTableReadonly && (
                   <div className="flex items-center gap-1 mr-2">
                     <button
                       onClick={handleUndo}
@@ -4908,7 +4911,7 @@ const App: React.FC<AppProps> = ({
                     </button>
                   </div>
                 )}
-                {!(readonly || isSharedMode) && (
+                {!isTableReadonly && (
                   <button
                     onClick={() => setIsTokenDialogOpen(true)}
                     className="flex items-center gap-1 px-3 py-1.5 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded transition-colors font-medium text-xs mr-2"
@@ -4916,7 +4919,7 @@ const App: React.FC<AppProps> = ({
                     <ICONS.Settings className="w-4 h-4" /> 配置Token
                   </button>
                 )}
-                {!(readonly || isSharedMode) && (
+                {!isTableReadonly && activeTable?.can_manage !== false && (
                   <button
                     onClick={() => setIsCollaboratorDialogOpen(true)}
                     className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors font-medium text-xs"
@@ -4966,7 +4969,7 @@ const App: React.FC<AppProps> = ({
                 activeView &&
                 activeView.type === ViewType.GRID && (
                   <GridView
-                    readonly={readonly || isSharedMode}
+                    readonly={isTableReadonly}
                     key={activeView.id}
                     tableId={activeTable.id}
                     columns={visibleColumns}
@@ -5396,7 +5399,7 @@ const App: React.FC<AppProps> = ({
               drag
               dragControls={dragControls}
               dragListener={false}
-              className="absolute top-4 right-4 z-[9999]"
+              className="absolute top-4 right-4 z-index:40"
             >
               <div className="bg-white shadow-xl border border-gray-200 rounded-lg p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div

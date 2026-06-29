@@ -42,7 +42,7 @@ export const Select: React.FC<SelectProps> = ({
   const selectRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState<{ top?: number, bottom?: number, left: number, width: number }>({ top: 0, left: 0, width: 0 });
 
   const showFilter = isModelSelector || showSearch;
   
@@ -134,11 +134,21 @@ export const Select: React.FC<SelectProps> = ({
     const spaceAbove = rect.top;
     const shouldShowAbove = spaceBelow < 250 && spaceAbove > spaceBelow;
 
-    setDropdownPosition({
-      top: shouldShowAbove ? Math.max(10, rect.top - 310) : rect.bottom,
-      left: rect.left,
-      width: rect.width,
-    });
+    if (shouldShowAbove) {
+      setDropdownPosition({
+        top: undefined,
+        bottom: viewportHeight - rect.top + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    } else {
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        bottom: undefined,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
   };
 
   useEffect(() => {
@@ -157,6 +167,18 @@ export const Select: React.FC<SelectProps> = ({
   useLayoutEffect(() => {
     if (!isOpen) return;
     updateDropdownPosition();
+
+    const handleScrollOrResize = () => {
+      updateDropdownPosition();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
   }, [isOpen, portal]);
 
   const selectedOption = options.find(opt => opt.value === value);
@@ -174,7 +196,7 @@ export const Select: React.FC<SelectProps> = ({
       ref={dropdownRef} 
       data-select-dropdown="true"
       className={`z-[20000] bg-white border border-gray-200 rounded-xl shadow-xl shadow-black/[0.04] overflow-y-auto max-h-[300px] flex flex-col transform origin-top animate-in fade-in slide-in-from-top-2 duration-200 ${portal ? '' : 'absolute left-0 mt-2 min-w-full w-max max-w-[320px]'}`}
-      style={portal ? { position: 'fixed', top: dropdownPosition.top, left: dropdownPosition.left, minWidth: dropdownPosition.width, width: 'max-content', maxWidth: 'min(400px, 90vw)' } : {}}
+      style={portal ? { position: 'fixed', top: dropdownPosition.top, bottom: dropdownPosition.bottom, left: dropdownPosition.left, minWidth: dropdownPosition.width, width: 'max-content', maxWidth: 'min(400px, 90vw)' } : {}}
     >
       {showFilter && (
         <div className="p-2 border-b border-gray-100 flex-shrink-0 bg-white">
