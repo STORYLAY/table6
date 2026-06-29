@@ -11,6 +11,7 @@ import React, {
   useRef,
 } from "react";
 import { motion, useDragControls } from "framer-motion";
+import { createPortal } from "react-dom";
 import Sidebar from "./components/Sidebar";
 import GridView from "./components/GridView";
 import KanbanView from "./components/KanbanView";
@@ -163,11 +164,41 @@ const App: React.FC<AppProps> = ({
   const isSharedMode = typeof window !== 'undefined' && window.location.hostname.includes('ais-pre');
   const [tables, setTables] = useState<Table[]>([]);
   // ... existing state ...
-  const [activeTableId, setActiveTableId] = useState<string | null>(defaultTableId);
+  const initialSearchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const searchId = initialSearchParams.get('search_id');
+  const [activeTableId, setActiveTableId] = useState<string | null>(searchId || defaultTableId);
   const activeTableIdRef = useRef(activeTableId);
   useEffect(() => {
     activeTableIdRef.current = activeTableId;
   }, [activeTableId]);
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const currentParams = new URLSearchParams(window.location.search);
+      const currentSearchId = currentParams.get('search_id');
+      if (currentSearchId && currentSearchId !== activeTableIdRef.current) {
+        setActiveTableId(currentSearchId);
+      }
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    // Also listen to pushState/replaceState if they are overridden by a parent app
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      handleUrlChange();
+    };
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      handleUrlChange();
+    };
+
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      history.pushState = originalPushState;
+      history.replaceState = originalReplaceState;
+    };
+  }, []);
 
   // Full details for the active table
   const [activeTable, setActiveTable] = useState<Table | null>(null);
@@ -5394,47 +5425,47 @@ const App: React.FC<AppProps> = ({
             />
           )}
 
-          {/* Search Panel */}
+           {/* Search Panel */}
           {isSearchOpen && activeView && (
-            <motion.div
-              drag
+              <motion.div
+                drag
               dragConstraints={searchContainerRef}
-              dragElastic={0.1}
-              dragMomentum={false}
-              dragControls={dragControls}
-              dragListener={false}
-              className="absolute top-4 right-4 z-[9999]"
-            >
-              <div className="bg-white shadow-xl border border-gray-200 rounded-lg p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                <div
-                  className="cursor-move p-1"
-                  onPointerDown={(e) => dragControls.start(e)}
-                >
-                  <ICONS.Search className="w-4 h-4 text-gray-400" />
+                dragElastic={0.1}
+                dragMomentum={false}
+                dragControls={dragControls}
+                dragListener={false}
+              className="absolute top-4 right-4 z-40"
+              >
+                <div className="bg-white shadow-xl border border-gray-200 rounded-lg p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div
+                    className="cursor-move p-1"
+                    onPointerDown={(e) => dragControls.start(e)}
+                  >
+                    <ICONS.Search className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <input
+                    className="w-40 text-sm outline-none text-gray-700 placeholder-gray-400"
+                    placeholder="查找..."
+                    autoFocus
+                    defaultValue={rowSearchKeyword}
+                    onChange={(e) => handleRowSearch(e.target.value)}
+                  />
+                  <div className="h-4 w-[1px] bg-gray-200 mx-1"></div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap px-1">
+                    {rowSearchKeyword ? `共 ${rows.length} 条` : "请输入关键字"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setIsSearchOpen(false);
+                      setRowSearchKeyword("");
+                      handleRowSearch("");
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors ml-1"
+                  >
+                    <ICONS.Close className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <input
-                  className="w-40 text-sm outline-none text-gray-700 placeholder-gray-400"
-                  placeholder="查找..."
-                  autoFocus
-                  defaultValue={rowSearchKeyword}
-                  onChange={(e) => handleRowSearch(e.target.value)}
-                />
-                <div className="h-4 w-[1px] bg-gray-200 mx-1"></div>
-                <span className="text-xs text-gray-400 whitespace-nowrap px-1">
-                  {rowSearchKeyword ? `共 ${rows.length} 条` : "请输入关键字"}
-                </span>
-                <button
-                  onClick={() => {
-                    setIsSearchOpen(false);
-                    setRowSearchKeyword("");
-                    handleRowSearch("");
-                  }}
-                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors ml-1"
-                >
-                  <ICONS.Close className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </motion.div>
+              </motion.div>
           )}
         </div>
       </div>

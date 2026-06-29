@@ -48,8 +48,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const activeItemRef = useRef<HTMLButtonElement>(null);
   
   const activeTable = tables.find(t => t.id === activeTableId);
+
+  useEffect(() => {
+    if (activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [activeTableId]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -193,6 +200,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                   ) : (
                     <button
+                        ref={activeTableId === table.id ? activeItemRef : null}
                         onClick={() => onTableSelect(table.id)}
                         onContextMenu={(e) => handleContextMenu(e, table.id)}
                         className={`w-full text-left px-4 py-2 flex items-center gap-2 text-sm font-medium transition-colors relative pr-8 ${
